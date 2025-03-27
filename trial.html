@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Problem Set Trials with Fixed 65dB Noise</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #trial-info, #trial-results {
+      margin-bottom: 20px;
+      font-size: 1.2em;
+    }
+    .problem {
+      margin: 10px 0;
+      padding: 8px;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+    .problem span {
+      font-weight: bold;
+    }
+    .problem input {
+      margin-left: 10px;
+      width: 100px;
+      padding: 4px;
+      font-size: 1em;
+    }
+    button {
+      font-size: 1em;
+      padding: 10px 20px;
+      margin-right: 10px;
+    }
+    #results {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+    /* Default: hide the player; it will be shown for noise trials */
+    #player {
+      display: none;
+      margin-bottom: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #eee;
+    }
+  </style>
+  <!-- Load YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+  <h1>Problem Set Trials</h1>
+  <!-- YouTube player: will be shown only for noise trials -->
+  <div id="player"></div>
+
+  <div id="trial-info"></div>
+  <div id="problems"></div>
+  <div id="trial-results"></div>
+
+  <button id="startButton">Start</button>
+  <button id="endButton" disabled>End</button>
+  <button id="nextTrialButton" disabled>Next Trial</button>
+
+  <div id="results"></div>
+
+  <script>
+    // Define the two sets of problems and their correct answers.
+    var set1 = [
+      "(4+2)×3=",
+      "7−(1+5)=",
+      "(8×2)−6=",
+      "9÷3+4=",
+      "5+(2×6)=",
+      "(8−3)×2=",
+      "15÷(5+0)=",
+      "(6×3)+(5−2)=",
+      "9+4−(2×3)=",
+      "(8+1)÷2+3="
+    ];
+    var set1Answers = [18, 1, 10, 7, 17, 10, 3, 21, 7, 7.5];
+
+    var set2 = [
+      "(25+19)×2=",
+      "96−(15×4)=",
+      "(48÷8)+35=",
+      "105−(9×6)=",
+      "(60+40)÷5=",
+      "144÷(6+6)=",
+      "(30×4)−(27÷9)=",
+      "(50−22)×3+7=",
+      "81÷(11−2)+12=",
+      "(100−55)÷5+6="
+    ];
+    var set2Answers = [88, 36, 41, 51, 20, 12, 117, 91, 21, 15];
+
+    // Define the trial order: each trial has a problem set (1 or 2) and noise condition.
+    var trials = [
+      { set: 1, noise: false },
+      { set: 1, noise: true },
+      { set: 2, noise: false },
+      { set: 2, noise: true }
+    ];
+
+    var currentTrial = 0;
+    var startTime;
+    var trialResults = []; // Stores each trial's { time, correct } results.
+
+    // Cache DOM elements.
+    var trialInfoDiv = document.getElementById("trial-info");
+    var problemsDiv = document.getElementById("problems");
+    var trialResultsDiv = document.getElementById("trial-results");
+    var resultsDiv = document.getElementById("results");
+    var startButton = document.getElementById("startButton");
+    var endButton = document.getElementById("endButton");
+    var nextTrialButton = document.getElementById("nextTrialButton");
+
+    // Function to load a trial based on the currentTrial index.
+    function loadTrial() {
+      // Clear previous trial results.
+      trialResultsDiv.innerHTML = "";
+      problemsDiv.innerHTML = "";
+      resultsDiv.innerHTML = "";
+      nextTrialButton.disabled = true;
+
+      if (currentTrial >= trials.length) {
+        displayOverallSummary();
+        return;
+      }
+
+      var trial = trials[currentTrial];
+      trialInfoDiv.innerHTML = "Trial " + (currentTrial + 1) + ": " +
+        (trial.noise ? "With Noise" : "No Noise") + " — Set " + trial.set;
+
+      // Display the appropriate problem set.
+      var problems = (trial.set === 1) ? set1 : set2;
+      problems.forEach(function(problemText, index) {
+        var div = document.createElement("div");
+        div.className = "problem";
+        var span = document.createElement("span");
+        span.textContent = problemText;
+        div.appendChild(span);
+        // Create input field.
+        var input = document.createElement("input");
+        input.type = "text";
+        input.className = "answer-input";
+        input.dataset.index = index; // Used for answer checking.
+        input.disabled = true; // Initially disabled until the trial starts.
+        div.appendChild(input);
+        problemsDiv.appendChild(div);
+      });
+
+      // For trials with background noise, show the player; otherwise, hide it.
+      if (trial.noise) {
+        document.getElementById("player").style.display = "block";
+      } else {
+        document.getElementById("player").style.display = "none";
+        player.pauseVideo();
+        player.mute();
+      }
+
+      // Reset buttons.
+      startButton.disabled = false;
+      endButton.disabled = true;
+    }
+
+    // Display the overall summary when all trials are completed.
+    function displayOverallSummary() {
+      trialInfoDiv.innerHTML = "All trials completed.";
+      problemsDiv.innerHTML = "";
+      trialResultsDiv.innerHTML = "";
+
+      var summaryHTML = "<h2>Overall Summary</h2>";
+      summaryHTML += "<table><tr><th>Trial</th><th>Time Taken (seconds)</th><th>Correct Answers</th></tr>";
+      trialResults.forEach(function(result, index) {
+        summaryHTML += "<tr><td>" + (index + 1) + "</td><td>" + result.time +
+          "</td><td>" + result.correct + " / 10</td></tr>";
+      });
+      summaryHTML += "</table>";
+      resultsDiv.innerHTML = summaryHTML;
+      // Stop any background noise.
+      player.pauseVideo();
+      // Hide control buttons.
+      startButton.style.display = "none";
+      endButton.style.display = "none";
+      nextTrialButton.style.display = "none";
+    }
+
+    // Event listener for the Start button.
+    startButton.addEventListener("click", function() {
+      startTime = new Date();
+      startButton.disabled = true;
+      endButton.disabled = false;
+
+      // Enable the input fields for answers.
+      var inputs = document.getElementsByClassName("answer-input");
+      for (var i = 0; i < inputs.length; i++) {
+        inputs[i].disabled = false;
+      }
+
+      // If the trial has noise, start playing the video from 1 minute.
+      var trial = trials[currentTrial];
+      if (trial.noise) {
+        player.unMute();
+        // Set volume fixed at 65 (relative percentage).
+        player.setVolume(65);
+        // Seek to 60 seconds (1 minute) and play.
+        player.seekTo(60, true);
+        player.playVideo();
+      }
+    });
+
+    // Event listener for the End button.
+    endButton.addEventListener("click", function() {
+      var endTime = new Date();
+      var elapsed = ((endTime - startTime) / 1000).toFixed(2);
+
+      // Check answers.
+      var trial = trials[currentTrial];
+      var correctAnswers = (trial.set === 1) ? set1Answers : set2Answers;
+      var inputs = document.getElementsByClassName("answer-input");
+      var correctCount = 0;
+      for (var i = 0; i < inputs.length; i++) {
+        var userAns = parseFloat(inputs[i].value);
+        var correctAns = correctAnswers[i];
+        // Allow for small floating-point errors.
+        if (!isNaN(userAns) && Math.abs(userAns - correctAns) < 0.001) {
+          correctCount++;
+        }
+      }
+
+      // Display the trial results.
+      trialResultsDiv.innerHTML = "Trial " + (currentTrial + 1) + " Results: Time taken: " +
+        elapsed + " seconds; Correct Answers: " + correctCount + " out of 10.";
+
+      // Save the trial result.
+      trialResults.push({ time: elapsed, correct: correctCount });
+
+      // Disable End button and enable Next Trial.
+      endButton.disabled = true;
+      nextTrialButton.disabled = false;
+    });
+
+    nextTrialButton.addEventListener("click", function() {
+      currentTrial++;
+      loadTrial();
+    });
+
+    // YouTube IFrame API integration.
+    var player;
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '200',  // Adjust height as needed.
+        width: '320',   // Adjust width as needed.
+        videoId: 'Q5jiitmLBOY', // YouTube video id.
+        playerVars: {
+          'playsinline': 1,
+          'autoplay': 0,
+          'loop': 1,
+          'playlist': 'Q5jiitmLBOY'
+        },
+        events: {
+          'onReady': onPlayerReady
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      // Start with the player muted.
+      player.mute();
+      // Load the first trial.
+      loadTrial();
+    }
+
+    // Ensure the volume remains fixed at 65% when the video is playing.
+    setInterval(function() {
+      if (player && player.getPlayerState() === YT.PlayerState.PLAYING) {
+        player.setVolume(65);
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
